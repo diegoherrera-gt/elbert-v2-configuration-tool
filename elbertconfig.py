@@ -548,24 +548,24 @@ def main():
 	print("* Numato Lab Elbert Configuration Tool *")
 	print("****************************************")
 
-	# # Inicio - Comentar para debuguear	
-	# if(len(sys.argv) != 3):
-	# 	print("ERROR: Invalid number of arguments.\n")
-	# 	print("Usage : elbertconfig.py <PORT> <Binary File>\n")
-	# 	print("PORT - The serial portcorresponds to Elbert (Eg: COM1)\n")
-	# 	print("Binary File - Binary file to be downloaded. Please see Elbert")
-	# 	print("documentation for more details on generating binary file from")
-	# 	print("your design.")
-	# 	exit(1)
+	# Inicio - Comentar para debuguear	
+	if(len(sys.argv) != 3):
+		print("ERROR: Invalid number of arguments.\n")
+		print("Usage : elbertconfig.py <PORT> <Binary File>\n")
+		print("PORT - The serial portcorresponds to Elbert (Eg: COM1)\n")
+		print("Binary File - Binary file to be downloaded. Please see Elbert")
+		print("documentation for more details on generating binary file from")
+		print("your design.")
+		exit(1)
 	
-	# ElbertconfigObj = ElbertConfigDownloader(sys.argv[1])
-	# ElbertconfigObj.ConfigureElbert(sys.argv[2])
-	# # Fin - Comentar para debuguear
+	ElbertconfigObj = ElbertConfigDownloader(sys.argv[1])
+	ElbertconfigObj.ConfigureElbert(sys.argv[2])
+	# Fin - Comentar para debuguear
 
-	# Inicio - Descomentar para debuguear	
-	ElbertconfigObj = ElbertConfigDownloader('COM6')
-	ElbertconfigObj.ConfigureElbert('switch_led.bin')
-	# Fin - Descomentar para debuguear
+	# # Inicio - Descomentar para debuguear	
+	# ElbertconfigObj = ElbertConfigDownloader('COM6')
+	# ElbertconfigObj.ConfigureElbert('and_gate.bin')
+	# # Fin - Descomentar para debuguear
 
 
 if __name__ == "__main__":
