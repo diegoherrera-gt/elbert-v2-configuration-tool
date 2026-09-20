@@ -1,21 +1,133 @@
-<main class="container">
-  <h1>Welcome to Tauri + Angular!</h1>
+<main>
+  <header>
+    <h1>Elbert V2 Configuration Tool</h1>
 
-  <div class="row">
-    <a href="https://tauri.app" target="_blank">
-      <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-    </a>
-    <a href="https://angular.io" target="_blank">
-      <img src="/assets/angular.svg" class="logo angular" alt="Angular logo" />
-    </a>
-  </div>
-  <p>Click on the logos to learn more about the frameworks</p>
+    <p>
+      Configure and program your Numato Lab Elbert V2 FPGA board.
+    </p>
+  </header>
 
-  <form class="row" (submit)="greet($event, greetInput.value)">
-    <input #greetInput id="greet-input" placeholder="Enter a name..." />
-    <button type="submit">Greet</button>
+  <form (submit)="flash($event, portSelect.value)">
+    <fieldset>
+      <legend>Device</legend>
+
+      <p>
+        <label for="port">
+          Serial port
+        </label>
+      </p>
+
+      <p>
+        <select #portSelect id="port" name="port" required>
+          <option value="" selected disabled>
+            Select a COM port
+          </option>
+
+          @for (port of ports(); track port.port_name) {
+          <option [value]="port.port_name">
+            {{ port.label }}
+          </option>
+          }
+        </select>
+
+        <button type="button" (click)="refreshPorts()">
+          Refresh
+        </button>
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>FPGA bitstream</legend>
+
+      <p>
+        <label>
+          Binary configuration file
+        </label>
+      </p>
+
+      <p>
+        <button type="button" (click)="selectBinFile()">
+          Select BIN file
+        </button>
+      </p>
+
+      @if (selectedBinPath()) {
+      <p>
+        <strong>Selected file:</strong>
+      </p>
+
+      <p>
+        <code>
+            {{ selectedBinPath() }}
+          </code>
+      </p>
+      } @else {
+      <p>
+        No file selected.
+      </p>
+      }
+    </fieldset>
+
+    <fieldset>
+      <legend>Programming</legend>
+
+      <p>
+        <button type="submit">
+          Flash FPGA
+        </button>
+
+        <button type="reset" (click)="resetForm()">
+          Clear
+        </button>
+      </p>
+
+      <p>
+        <label for="flash-progress">
+          Progress
+        </label>
+      </p>
+
+      <progress id="flash-progress" [value]="progress()" max="100">
+        {{ progress() }}%
+      </progress>
+
+      <section>
+        <h3>Programming output</h3>
+
+        <pre>
+        @for (log of logs(); track $index) {
+        {{ log }}
+        }
+        </pre>
+      </section>
+
+      <p>
+        Status:
+        <output>
+          {{ status() }}
+        </output>
+      </p>
+    </fieldset>
   </form>
-  <p>{{ greetingMessage() }}</p>
 
-  <router-outlet />
+  <details>
+    <summary>
+      Advanced information
+    </summary>
+
+    <dl>
+      <dt>Board</dt>
+      <dd>Numato Lab Elbert V2</dd>
+
+      <dt>FPGA</dt>
+      <dd>Xilinx Spartan-3A XC3S50A</dd>
+
+      <dt>Flash</dt>
+      <dd>Micron M25P16</dd>
+    </dl>
+  </details>
+
+  <!-- <button type="button" (click)="testExternalProcess()">
+    Test External Process
+  </button> -->
 </main>

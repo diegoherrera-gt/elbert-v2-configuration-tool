@@ -507,6 +507,8 @@ class ElbertConfigDownloader:
 			
 			i, j, address = 0, 0, 0
 
+			last_progress = -1
+
 			while fileSize:
 				j = 0x100 if fileSize > 0x100 else fileSize 
 				self.M25P16PageProgram(dataBuff[address:address+j], address, j)
@@ -517,8 +519,11 @@ class ElbertConfigDownloader:
 				while self.M25P16ReadStatus() & 0x01:
 					time.sleep(0.01)
 				
-				sys.stdout.write("Writing to flash " + str(int((address/fileSizeForProgressInd)*100)) + "% complete...\r")
-				sys.stdout.flush()
+				progress = int((address / fileSizeForProgressInd) * 100)
+
+				if progress != last_progress:
+					print("PROGRESS:" + str(progress), flush=True)
+					last_progress = progress
 			
 			#verify the flash contents
 			print("\nVerifying flash contents...")
