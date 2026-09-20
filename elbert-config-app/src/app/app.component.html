@@ -1,0 +1,133 @@
+<main>
+  <header>
+    <h1>Elbert V2 Configuration Tool</h1>
+
+    <p>
+      Configure and program your Numato Lab Elbert V2 FPGA board.
+    </p>
+  </header>
+
+  <form (submit)="flash($event, portSelect.value)">
+    <fieldset>
+      <legend>Device</legend>
+
+      <p>
+        <label for="port">
+          Serial port
+        </label>
+      </p>
+
+      <p>
+        <select #portSelect id="port" name="port" required>
+          <option value="" selected disabled>
+            Select a COM port
+          </option>
+
+          @for (port of ports(); track port.port_name) {
+          <option [value]="port.port_name">
+            {{ port.label }}
+          </option>
+          }
+        </select>
+
+        <button type="button" (click)="refreshPorts()">
+          Refresh
+        </button>
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>FPGA bitstream</legend>
+
+      <p>
+        <label>
+          Binary configuration file
+        </label>
+      </p>
+
+      <p>
+        <button type="button" (click)="selectBinFile()">
+          Select BIN file
+        </button>
+      </p>
+
+      @if (selectedBinPath()) {
+      <p>
+        <strong>Selected file:</strong>
+      </p>
+
+      <p>
+        <code>
+            {{ selectedBinPath() }}
+          </code>
+      </p>
+      } @else {
+      <p>
+        No file selected.
+      </p>
+      }
+    </fieldset>
+
+    <fieldset>
+      <legend>Programming</legend>
+
+      <p>
+        <button type="submit">
+          Flash FPGA
+        </button>
+
+        <button type="reset" (click)="resetForm()">
+          Clear
+        </button>
+      </p>
+
+      <p>
+        <label for="flash-progress">
+          Progress
+        </label>
+      </p>
+
+      <progress id="flash-progress" [value]="progress()" max="100">
+        {{ progress() }}%
+      </progress>
+
+      <section>
+        <h3>Programming output</h3>
+
+        <pre>
+        @for (log of logs(); track $index) {
+        {{ log }}
+        }
+        </pre>
+      </section>
+
+      <p>
+        Status:
+        <output>
+          {{ status() }}
+        </output>
+      </p>
+    </fieldset>
+  </form>
+
+  <details>
+    <summary>
+      Advanced information
+    </summary>
+
+    <dl>
+      <dt>Board</dt>
+      <dd>Numato Lab Elbert V2</dd>
+
+      <dt>FPGA</dt>
+      <dd>Xilinx Spartan-3A XC3S50A</dd>
+
+      <dt>Flash</dt>
+      <dd>Micron M25P16</dd>
+    </dl>
+  </details>
+
+  <!-- <button type="button" (click)="testExternalProcess()">
+    Test External Process
+  </button> -->
+</main>
