@@ -1,11 +1,14 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// Learn more about Tauri commands at:
+// https://tauri.app/develop/calling-rust/
+
 use serde::Serialize;
-use std::{
-    io::{BufRead, BufReader},
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::process::Command;
+
 use tauri::ipc::Channel;
+use tauri_plugin_shell::{
+    process::CommandEvent,
+    ShellExt,
+};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -29,10 +32,13 @@ fn test_external_process() -> Result<String, String> {
         .map_err(|e| format!("Failed to execute process: {}", e))?;
 
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+        return Err(
+            String::from_utf8_lossy(&output.stderr).to_string()
+        );
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stdout =
+        String::from_utf8_lossy(&output.stdout).to_string();
 
     println!("External process output:");
     println!("{}", stdout);
@@ -53,8 +59,10 @@ struct SerialPortInfoDto {
 
 #[tauri::command]
 fn list_serial_ports() -> Result<Vec<SerialPortInfoDto>, String> {
-    let ports =
-        serialport::available_ports().map_err(|e| format!("Failed to list serial ports: {}", e))?;
+    let ports = serialport::available_ports()
+        .map_err(|e| {
+            format!("Failed to list serial ports: {}", e)
+        })?;
 
     let result = ports
         .into_iter()
@@ -65,7 +73,9 @@ fn list_serial_ports() -> Result<Vec<SerialPortInfoDto>, String> {
             let mut product = None;
             let mut serial_number = None;
 
-            if let serialport::SerialPortType::UsbPort(usb_info) = port.port_type {
+            if let serialport::SerialPortType::UsbPort(usb_info) =
+                port.port_type
+            {
                 vid = Some(usb_info.vid);
                 pid = Some(usb_info.pid);
                 manufacturer = usb_info.manufacturer.clone();
@@ -79,7 +89,11 @@ fn list_serial_ports() -> Result<Vec<SerialPortInfoDto>, String> {
                 .unwrap_or_else(|| "Serial Port".to_string());
 
             SerialPortInfoDto {
-                label: format!("{} — {}", port.port_name, description),
+                label: format!(
+                    "{} — {}",
+                    port.port_name,
+                    description
+                ),
                 port_name: port.port_name,
                 vid,
                 pid,
@@ -94,21 +108,34 @@ fn list_serial_ports() -> Result<Vec<SerialPortInfoDto>, String> {
 }
 
 #[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "event", content = "data")]
+#[serde(
+    rename_all = "camelCase",
+    tag = "event",
+    content = "data"
+)]
 enum FlashEvent {
     Started,
 
-    Output { message: String },
+    Output {
+        message: String,
+    },
 
-    Progress { percentage: u8 },
+    Progress {
+        percentage: u8,
+    },
 
-    Error { message: String },
+    Error {
+        message: String,
+    },
 
-    Finished { success: bool },
+    Finished {
+        success: bool,
+    },
 }
 
 #[tauri::command]
-fn flash_elbert(
+async fn flash_elbert(
+    app: tauri::AppHandle,
     port: String,
     bin_path: String,
     on_event: Channel<FlashEvent>,
@@ -121,92 +148,168 @@ fn flash_elbert(
     println!("Port: {}", port);
     println!("BIN: {}", bin_path);
 
-    // src-tauri/
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // IMPORTANT:
+    // Use only the sidecar filename here.
+    //
+    // tauri.conf.json:
+    // "externalBin": ["binaries/elbert-core"]
+    //
+    // physical file:
+    // binaries/elbert-core-x86_64-pc-windows-msvc.exe
+    let sidecar = app
+        .shell()
+        .sidecar("elbert-core")
+        .map_err(|e| {
+            format!(
+                "Could not create Elbert sidecar command: {}",
+                e
+            )
+        })?
+        .args([
+            port.as_str(),
+            bin_path.as_str(),
+        ]);
 
-    // repo-root/elbertconfig.py
-    let script_path = manifest_dir
-        .join("../../elbertconfig.py")
-        .canonicalize()
-        .map_err(|e| format!("Could not locate elbertconfig.py: {}", e))?;
-
-    println!("Python script: {:?}", script_path);
-
-    let mut child = Command::new("python")
-        .arg("-u")
-        .arg(&script_path)
-        .arg(&port)
-        .arg(&bin_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let (mut rx, _child) = sidecar
         .spawn()
-        .map_err(|e| format!("Failed to start Python: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to start Elbert programmer: {}",
+                e
+            )
+        })?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("Unable to capture Python stdout")?;
+    let mut success = false;
 
-    let reader = BufReader::new(stdout);
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(bytes) => {
+                let line =
+                    String::from_utf8_lossy(&bytes)
+                        .trim()
+                        .to_string();
 
-    for line in reader.lines() {
-        let line = line.map_err(|e| e.to_string())?;
+                if line.is_empty() {
+                    continue;
+                }
 
-        println!("[PYTHON] {}", line);
+                println!("[ELBERT] {}", line);
 
-        if let Some(value) = line.strip_prefix("PROGRESS:") {
-            if let Ok(percentage) = value.trim().parse::<u8>() {
-                let _ = on_event.send(FlashEvent::Progress { percentage });
+                if let Some(value) =
+                    line.strip_prefix("PROGRESS:")
+                {
+                    if let Ok(percentage) =
+                        value.trim().parse::<u8>()
+                    {
+                        let _ = on_event.send(
+                            FlashEvent::Progress {
+                                percentage,
+                            },
+                        );
 
-                continue;
+                        continue;
+                    }
+                }
+
+                let _ = on_event.send(
+                    FlashEvent::Output {
+                        message: line,
+                    },
+                );
             }
-        }
 
-        let _ = on_event.send(FlashEvent::Output { message: line });
+            CommandEvent::Stderr(bytes) => {
+                let line =
+                    String::from_utf8_lossy(&bytes)
+                        .trim()
+                        .to_string();
+
+                if line.is_empty() {
+                    continue;
+                }
+
+                println!(
+                    "[ELBERT ERROR] {}",
+                    line
+                );
+
+                let _ = on_event.send(
+                    FlashEvent::Error {
+                        message: line,
+                    },
+                );
+            }
+
+            CommandEvent::Error(error) => {
+                println!(
+                    "[SIDECAR ERROR] {}",
+                    error
+                );
+
+                let _ = on_event.send(
+                    FlashEvent::Error {
+                        message: error,
+                    },
+                );
+            }
+
+            CommandEvent::Terminated(payload) => {
+                println!(
+                    "Elbert sidecar terminated. Code: {:?}",
+                    payload.code
+                );
+
+                success =
+                    payload.code == Some(0);
+
+                break;
+            }
+
+            _ => {}
+        }
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("Failed waiting for Python: {}", e))?;
-
-    if !output.stderr.is_empty() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        for line in stderr.lines() {
-            println!("[PYTHON ERROR] {}", line);
-
-            let _ = on_event.send(FlashEvent::Error {
-                message: line.to_string(),
-            });
-        }
-    }
-
-    let success = output.status.success();
-
-    let _ = on_event.send(FlashEvent::Finished { success });
+    let _ = on_event.send(
+        FlashEvent::Finished {
+            success,
+        },
+    );
 
     if success {
         Ok(())
     } else {
-        Err(format!(
-            "Python exited with code {:?}",
-            output.status.code()
-        ))
+        Err(
+            "Elbert programmer exited with an error"
+                .to_string()
+        )
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            test_invoke,
-            test_external_process,
-            list_serial_ports,
-            flash_elbert
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .plugin(
+            tauri_plugin_shell::init()
+        )
+        .plugin(
+            tauri_plugin_dialog::init()
+        )
+        .plugin(
+            tauri_plugin_opener::init()
+        )
+        .invoke_handler(
+            tauri::generate_handler![
+                greet,
+                test_invoke,
+                test_external_process,
+                list_serial_ports,
+                flash_elbert
+            ],
+        )
+        .run(
+            tauri::generate_context!()
+        )
+        .expect(
+            "error while running tauri application"
+        );
 }
